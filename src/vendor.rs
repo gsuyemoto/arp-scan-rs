@@ -9,71 +9,107 @@ use csv::{Position, Reader};
 // dedicated MAC address range that is registered by the IEEE and maintained in
 // the OUI database. An OUI is a 24-bit globally unique assigned number
 // referenced by various standards.
+// pub struct Vendor {
+//     reader: Option<Reader<File>>,
+// }
 pub struct Vendor {
-    reader: Option<Reader<File>>,
+    records: Vec<Record>,
 }
 
+type Record = (String, String, String, String, String);
 impl Vendor {
 
     // Create a new MAC vendor search instance based on the given datebase path
     // (absolute or relative). A failure will not throw an error, but leave the
     // vendor search instance without database reader.
-    pub fn new(path: &str) -> Self {
 
-        let file_result = File::open(path);
+    // pub fn new(path: &str) -> Self {
+
+    //     let file_result = File::open(path);
         
-        match file_result {
-            Ok(file) => Vendor {
-                reader: Some(Reader::from_reader(file)),
+    //     match file_result {
+    //         Ok(file) => Vendor {
+    //             reader: Some(Reader::from_reader(file)),
+    //         },
+    //         Err(_) => Vendor {
+    //             reader: None,
+    //         }
+    //     }
+    // }
+
+    pub fn new(path: &str) -> Self {
+        let mut records = Vec::new();
+        let file = match File::open(path) {
+            Ok(file) => file,
+            Err(e)   => {
+                eprintln!("Error deserializing ieee-oui: {:#?}", e);
+                std::process::exit(1)
             },
-            Err(_) => Vendor {
-                reader: None,
-            }
+        };
+
+        let mut rdr = Reader::from_reader(file);
+        for result in rdr.deserialize::<Record>() {
+            // We must tell Serde what type we want to deserialize into.
+            match result {
+                Ok(record) => records.push(record),
+                Err(e)     => {
+                    eprintln!("Error deserializing ieee-oui: {:#?}", e);
+                    std::process::exit(1)
+                },
+            };
+        }
+
+        dbg!(&records);
+        Vendor {
+            records,
         }
     }
 
     pub fn has_vendor_db(&self) -> bool {
-        self.reader.is_some()
+        self.records.len() > 0
     }
 
     // Find a vendor name based on a given MAC address. A vendor search
     // operation will perform a whole read on the database for now.
-    pub fn search_by_mac(&mut self, mac_address: &MacAddr) -> Option<String> {
+    // pub fn search_by_mac(&mut self, mac_address: &MacAddr) -> Option<String> {
 
-        match &mut self.reader {
-            Some(reader) => {
+    //     match &mut self.reader {
+    //         Some(reader) => {
 
-                // The {:02X} syntax forces to pad all numbers with zero values.
-                // This ensures that a MAC 002272... will not be printed as
-                // 02272 and therefore fails the search process.
-                let vendor_oui = format!("{:02X}{:02X}{:02X}", mac_address.0, mac_address.1, mac_address.2);
+    //             // The {:02X} syntax forces to pad all numbers with zero values.
+    //             // This ensures that a MAC 002272... will not be printed as
+    //             // 02272 and therefore fails the search process.
+    //             let vendor_oui = format!("{:02X}{:02X}{:02X}", mac_address.0, mac_address.1, mac_address.2);
 
-                // Since we share a common instance of the CSV reader, it must be reset
-                // before each read (internal buffers will be cleared).
-                reader.seek(Position::new()).unwrap_or_else(|err| {
-                    eprintln!("Could not reset the CSV reader ({})", err);
-                    process::exit(1);
-                });
+    //             // Since we share a common instance of the CSV reader, it must be reset
+    //             // before each read (internal buffers will be cleared).
+    //             reader.seek(Position::new()).unwrap_or_else(|err| {
+    //                 eprintln!("Could not reset the CSV reader ({})", err);
+    //                 process::exit(1);
+    //             });
 
-                for vendor_result in reader.records() {
+    //             for vendor_result in reader.records() {
             
-                    let record = vendor_result.unwrap_or_else(|err| {
-                        eprintln!("Could not read CSV record ({})", err);
-                        process::exit(1);
-                    });
-                    let potential_oui = record.get(1).unwrap_or("");
+    //                 let record = vendor_result.unwrap_or_else(|err| {
+    //                     eprintln!("Could not read CSV record ({})", err);
+    //                     process::exit(1);
+    //                 });
+    //                 let potential_oui = record.get(1).unwrap_or("");
             
-                    if vendor_oui.eq(potential_oui) {
-                        return Some(record.get(2).unwrap_or("(no vendor)").to_string())
-                    }
-                }
+    //                 if vendor_oui.eq(potential_oui) {
+    //                     return Some(record.get(2).unwrap_or("(no vendor)").to_string())
+    //                 }
+    //             }
 
-                None
-            }
-            None => None
-        }
-    }
+    //             None
+    //         }
+    //         None => None
+    //     }
+    // }
     
+    pub fn search_by_mac(&mut self, mac_address: &MacAddr) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(test)]
