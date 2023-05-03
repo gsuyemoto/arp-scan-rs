@@ -1,0 +1,16 @@
+[package]
+name = "arp-scan-benchmarks"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[[bench]]
+name = "main"
+path = "src/bench.rs"
+harness = false
+
+[dev-dependencies]
+arp-scan = { path = ".." }
+criterion = "0.4"

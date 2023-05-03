@@ -141,5 +141,4 @@ mod tests {
 
         assert_eq!(vendor.search_by_mac(&mac), Some("SomeCorp".to_string()));
     }
-
 }
