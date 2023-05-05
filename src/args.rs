@@ -127,6 +127,12 @@ pub fn build_args() -> Command {
                 .help("Path to custom IEEE OUI CSV file")
         )
         .arg(
+            Arg::new("update").short('u').long("update")
+                .action(ArgAction::SetTrue)
+                .exclusive(true)
+                .help("Update the local ieee-oui file and convert to binary")
+        )
+        .arg(
             Arg::new("list").short('l').long("list")
                 .action(ArgAction::SetTrue)
                 .exclusive(true)

@@ -37,6 +37,11 @@ pub fn start_scan() {
         process::exit(0);
     }
 
+    if matches.get_flag("update") {
+        vendor::update(None);
+        process::exit(0);
+    }
+
     // Assert requirements for a local network scan
     // --------------------------------------------
     // Ensure all requirements are met to perform an ARP scan on the local
@@ -85,7 +90,7 @@ pub fn start_scan() {
     let timed_out = Arc::new(AtomicBool::new(false));
     let cloned_timed_out = Arc::clone(&timed_out);
 
-    let mut vendor_list = Vendor::new(&scan_options.oui_file);
+    let mut vendor_list = Vendor::new(None);
 
     let cloned_options = Arc::clone(&scan_options);
     let arp_responses = thread::spawn(move || network::receive_arp_responses(&mut rx, cloned_options, cloned_timed_out, &mut vendor_list));

@@ -14,3 +14,4 @@ harness = false
 [dev-dependencies]
 arp-scan = { path = ".." }
 criterion = "0.4"
+pnet = "0.33"
