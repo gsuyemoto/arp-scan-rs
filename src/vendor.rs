@@ -9,6 +9,7 @@ use bincode::{serialize_into, deserialize_from};
 use pnet_datalink::MacAddr;
 use csv::{Position, Reader};
 use serde::{Serialize, Deserialize};
+use flate2::{Compression, write::ZlibEncoder};
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -110,7 +111,8 @@ pub fn update(path: Option<&str>) {
     // for easy loading later
     let vendor = Vendor { records };
     let mut new_file = BufWriter::new(File::create(IEE_OUI_FILE_BIN).unwrap());
-    serialize_into(&mut new_file, &vendor);
+    let mut flate2_encoder = ZlibEncoder::new(new_file, Compression::default());
+    serialize_into(&mut flate2_encoder, &vendor);
 
     println!("------- UPDATING COMPLETE -------");
 }
