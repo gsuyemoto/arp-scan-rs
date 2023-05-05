@@ -5,11 +5,16 @@ use std::{
     io::{BufWriter, BufReader},
 };
 
+use flate2::{
+    bufread,
+    Compression,
+    write::ZlibEncoder
+};
+
 use bincode::{serialize_into, deserialize_from};
 use pnet_datalink::MacAddr;
 use csv::{Position, Reader};
 use serde::{Serialize, Deserialize};
-use flate2::{Compression, write::ZlibEncoder};
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -51,9 +56,10 @@ impl Vendor {
     pub fn new(path: Option<&str>) -> Self {
         // maybe only accept .data (bincode) files here?
         // and load and parse .csv in the update function?
-        let file = get_file(path, IEE_OUI_FILE_BIN);
-        let ieee_oui = BufReader::new(file);
-        let records: HashMap<String, String> = deserialize_from(ieee_oui)
+        let file                             = get_file(path, IEE_OUI_FILE_BIN);
+        let file_buffer                      = BufReader::new(file);
+        let flate2_reader                    = bufread::ZlibDecoder::new(file_buffer);
+        let records: HashMap<String, String> = deserialize_from(flate2_reader)
             .expect("This shouldn't error unless the .data file was modified manually.");
 
         Vendor { records }
@@ -109,12 +115,16 @@ pub fn update(path: Option<&str>) {
     }
     // take the hashmap and serialize using bincode to a binary file
     // for easy loading later
-    let vendor = Vendor { records };
-    let mut new_file = BufWriter::new(File::create(IEE_OUI_FILE_BIN).unwrap());
+    let vendor             = Vendor { records };
+    let new_file           = BufWriter::new(File::create(IEE_OUI_FILE_BIN)
+                                .expect("Error creating ieee-oui.data file."));
     let mut flate2_encoder = ZlibEncoder::new(new_file, Compression::default());
-    serialize_into(&mut flate2_encoder, &vendor);
+    let serial_result      = serialize_into(&mut flate2_encoder, &vendor);
 
-    println!("------- UPDATING COMPLETE -------");
+    match serial_result {
+        Ok(_)  => println!("------- UPDATING COMPLETE -------"),
+        Err(e) => eprintln!("Error updating ieee-oui from web: {:#?}", e)
+    }
 }
 
 #[cfg(test)]
