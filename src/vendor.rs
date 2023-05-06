@@ -2,7 +2,7 @@ use std::{
     process,
     collections::HashMap,
     fs::File,
-    io::{BufWriter, BufReader},
+    io::{BufWriter, BufReader, Error},
 };
 
 use flate2::{
@@ -13,12 +13,8 @@ use flate2::{
 
 use bincode::{serialize_into, deserialize_from};
 use pnet_datalink::MacAddr;
-use csv::{Position, Reader};
+use csv::Reader;
 use serde::{Serialize, Deserialize};
-
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
 
 // The Vendor structure performs search operations on a vendor database to find
 // which MAC address belongs to a specific vendor. All network vendors have a
@@ -30,8 +26,9 @@ fn print_type_of<T>(_: &T) {
 // file is not provided in the command line
 // This file has already been deserialized and serialized
 // back into bincode format for faster loading
-pub static IEE_OUI_FILE_BIN: &'static str = "./data/ieee-oui.data";
-pub static IEE_OUI_FILE_CSV: &'static str = "./data/ieee-oui.csv";
+pub static IEEE_OUI_PATH: &'static str     = "./data/";
+pub static IEEE_OUI_FILE_BIN: &'static str = "ieee-oui.data";
+pub static IEEE_OUI_FILE_CSV: &'static str = "ieee-oui.csv";
 
 // Use hashmap for fast recovery of MAC and corresponding
 // company that is assigned that MAC
@@ -39,7 +36,7 @@ pub static IEE_OUI_FILE_CSV: &'static str = "./data/ieee-oui.csv";
 // Value: Company informaton
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Vendor{
-    records: HashMap<String, String>,
+    pub records: HashMap<String, String>,
 }
 
 // Deserialize the ieee-oui.csv to this format
@@ -56,7 +53,7 @@ impl Vendor {
     pub fn new(path: Option<&str>) -> Self {
         // maybe only accept .data (bincode) files here?
         // and load and parse .csv in the update function?
-        let file                             = get_file(path, IEE_OUI_FILE_BIN);
+        let file                             = get_file(path, IEEE_OUI_FILE_BIN, false);
         let file_buffer                      = BufReader::new(file);
         let flate2_reader                    = bufread::ZlibDecoder::new(file_buffer);
         let records: HashMap<String, String> = deserialize_from(flate2_reader)
@@ -80,11 +77,18 @@ impl Vendor {
 }
 
 // helper function to reduce redundant code
-fn get_file(path: Option<&str>, default: &'static str) -> File {
+fn get_file(path: Option<&str>, file_type: &'static str, file_create: bool) -> File {
     // maybe only accept .data (bincode) files here?
     // and load and parse .csv in the update function?
-    let file_path = path.unwrap_or(default);
-    let file = match File::open(file_path) {
+    let file_path = path.unwrap_or(IEEE_OUI_PATH);
+    let file: Result<File, Error>;
+
+    match file_create {
+        true      => file = File::create(file_path.to_owned() + file_type),
+        false     => file = File::open(file_path.to_owned() + file_type),
+    }
+
+    let file = match file {
         Ok(file) => file,
         Err(e)   => {
             eprintln!("Error opening ieee-oui file: {:#?}", e);
@@ -99,7 +103,7 @@ fn get_file(path: Option<&str>, default: &'static str) -> File {
 pub fn update(path: Option<&str>) {
     println!("------- UPDATING IEEE-OUI FILE FROM WEB -------");
     
-    let file = get_file(path, IEE_OUI_FILE_CSV);
+    let file = get_file(path, IEEE_OUI_FILE_CSV, false);
     let mut rdr = Reader::from_reader(file);
     // parse .csv file and insert records into hashmap
     let mut records = HashMap::new();
@@ -116,9 +120,9 @@ pub fn update(path: Option<&str>) {
     // take the hashmap and serialize using bincode to a binary file
     // for easy loading later
     let vendor             = Vendor { records };
-    let new_file           = BufWriter::new(File::create(IEE_OUI_FILE_BIN)
-                                .expect("Error creating ieee-oui.data file."));
-    let mut flate2_encoder = ZlibEncoder::new(new_file, Compression::default());
+    let file               = get_file(path, IEEE_OUI_FILE_BIN, true);
+    let buf_write          = BufWriter::new(file);
+    let mut flate2_encoder = ZlibEncoder::new(buf_write, Compression::default());
     let serial_result      = serialize_into(&mut flate2_encoder, &vendor);
 
     match serial_result {

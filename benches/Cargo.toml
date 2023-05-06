@@ -15,3 +15,4 @@ harness = false
 arp-scan = { path = ".." }
 criterion = "0.4"
 pnet = "0.33"
+regex = "1.8"
