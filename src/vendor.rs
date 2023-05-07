@@ -5,16 +5,9 @@ use std::{
     io::{BufWriter, BufReader, Error},
 };
 
-use flate2::{
-    bufread,
-    Compression,
-    write::ZlibEncoder
-};
-
-use bincode::{serialize_into, deserialize_from};
 use pnet_datalink::MacAddr;
 use csv::Reader;
-use serde::{Serialize, Deserialize};
+use speedy::{Readable, Writable};
 
 // The Vendor structure performs search operations on a vendor database to find
 // which MAC address belongs to a specific vendor. All network vendors have a
@@ -34,7 +27,7 @@ pub static IEEE_OUI_FILE_CSV: &'static str = "ieee-oui.csv";
 // company that is assigned that MAC
 // Key: MAC
 // Value: Company informaton
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Readable, Writable)]
 pub struct Vendor {
     pub records: HashMap<String, String>,
 }
@@ -55,10 +48,8 @@ impl Vendor {
         // and load and parse .csv in the update function?
         let file                             = get_file(path, IEEE_OUI_FILE_BIN, false);
         let file_buffer                      = BufReader::new(file);
-        let records: HashMap<String, String> = deserialize_from(file_buffer)
-            .expect("This shouldn't error unless the .data file was modified manually.");
-
-        Vendor { records }
+        let vendor                           = Readable::read_from_stream_buffered(file_buffer).unwrap();
+        vendor
     }
 
     pub fn has_vendor_db(&self) -> bool {
@@ -119,9 +110,9 @@ pub fn update(path: Option<&str>) {
     // take the hashmap and serialize using bincode to a binary file
     // for easy loading later
     let vendor             = Vendor { records };
-    let file               = get_file(path, IEEE_OUI_FILE_BIN, true);
-    let mut buf_write      = BufWriter::new(file);
-    let serial_result      = serialize_into(&mut buf_write, &vendor);
+    // let file               = get_file(path, IEEE_OUI_FILE_BIN, true);
+    // let mut buf_write      = BufWriter::new(file);
+    vendor.write_to_file("./data/ieee-oui.data");
 
     // match serial_result {
     //     Ok(_)  => println!("------- UPDATING COMPLETE -------"),
