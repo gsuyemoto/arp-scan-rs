@@ -3,6 +3,7 @@ pub mod network;
 pub mod time;
 pub mod utils;
 pub mod vendor;
+pub mod vendor_old;
 
 use std::net::IpAddr;
 use std::process;

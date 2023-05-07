@@ -35,7 +35,7 @@ pub static IEEE_OUI_FILE_CSV: &'static str = "ieee-oui.csv";
 // Key: MAC
 // Value: Company informaton
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Vendor{
+pub struct Vendor {
     pub records: HashMap<String, String>,
 }
 
@@ -55,8 +55,7 @@ impl Vendor {
         // and load and parse .csv in the update function?
         let file                             = get_file(path, IEEE_OUI_FILE_BIN, false);
         let file_buffer                      = BufReader::new(file);
-        let flate2_reader                    = bufread::ZlibDecoder::new(file_buffer);
-        let records: HashMap<String, String> = deserialize_from(flate2_reader)
+        let records: HashMap<String, String> = deserialize_from(file_buffer)
             .expect("This shouldn't error unless the .data file was modified manually.");
 
         Vendor { records }
@@ -101,7 +100,7 @@ fn get_file(path: Option<&str>, file_type: &'static str, file_create: bool) -> F
 
 // get ieee-oui file from web and convert to bincode .data file
 pub fn update(path: Option<&str>) {
-    println!("------- UPDATING IEEE-OUI FILE FROM WEB -------");
+    // println!("------- UPDATING IEEE-OUI FILE FROM WEB -------");
     
     let file = get_file(path, IEEE_OUI_FILE_CSV, false);
     let mut rdr = Reader::from_reader(file);
@@ -121,14 +120,13 @@ pub fn update(path: Option<&str>) {
     // for easy loading later
     let vendor             = Vendor { records };
     let file               = get_file(path, IEEE_OUI_FILE_BIN, true);
-    let buf_write          = BufWriter::new(file);
-    let mut flate2_encoder = ZlibEncoder::new(buf_write, Compression::default());
-    let serial_result      = serialize_into(&mut flate2_encoder, &vendor);
+    let mut buf_write      = BufWriter::new(file);
+    let serial_result      = serialize_into(&mut buf_write, &vendor);
 
-    match serial_result {
-        Ok(_)  => println!("------- UPDATING COMPLETE -------"),
-        Err(e) => eprintln!("Error updating ieee-oui from web: {:#?}", e)
-    }
+    // match serial_result {
+    //     Ok(_)  => println!("------- UPDATING COMPLETE -------"),
+    //     Err(e) => eprintln!("Error updating ieee-oui from web: {:#?}", e)
+    // }
 }
 
 #[cfg(test)]
