@@ -1,20 +1,16 @@
 use std::{
-    process,
     collections::HashMap,
+    fs,
     fs::File,
-    io::{BufWriter, BufReader, Error},
+    io::{BufWriter, BufReader},
 };
 
-use flate2::{
-    bufread,
-    Compression,
-    write::ZlibEncoder
-};
-
+use anyhow::Result;
 use bincode::{serialize_into, deserialize_from};
 use pnet_datalink::MacAddr;
 use csv::Reader;
 use serde::{Serialize, Deserialize};
+use log::{info, error};
 
 // The Vendor structure performs search operations on a vendor database to find
 // which MAC address belongs to a specific vendor. All network vendors have a
@@ -26,9 +22,10 @@ use serde::{Serialize, Deserialize};
 // file is not provided in the command line
 // This file has already been deserialized and serialized
 // back into bincode format for faster loading
+pub static IEEE_OUI_WEB: &'static str      = "http://standards-oui.ieee.org/oui/oui.csv";
 pub static IEEE_OUI_PATH: &'static str     = "./data/";
-pub static IEEE_OUI_FILE_BIN: &'static str = "ieee-oui.data";
-pub static IEEE_OUI_FILE_CSV: &'static str = "ieee-oui.csv";
+pub static IEEE_OUI_FILE_BIN: &'static str = "./data/ieee-oui.data";
+pub static IEEE_OUI_FILE_CSV: &'static str = "./data/ieee-oui.csv";
 
 // Use hashmap for fast recovery of MAC and corresponding
 // company that is assigned that MAC
@@ -50,13 +47,19 @@ type RawRecord = (String, String, String, String);
 impl Vendor {
 
 
-    pub fn new(path: Option<&str>) -> Self {
-        // maybe only accept .data (bincode) files here?
-        // and load and parse .csv in the update function?
-        let file                             = get_file(path, IEEE_OUI_FILE_BIN, false);
+    pub fn new() -> Self {
+        // check if data directory exists
+        // create directory and download ieee-oui file otherwise
+        if let Err(_) = fs::read_dir(IEEE_OUI_PATH) {
+            info!("Data directory doesn't exist. Will create and update.");
+            update();
+        }
+        
+        info!("CWD: {:?}", std::env::current_dir());
+        
+        let file                             = File::open(IEEE_OUI_FILE_BIN).expect("Error opening data file");
         let file_buffer                      = BufReader::new(file);
-        let records: HashMap<String, String> = deserialize_from(file_buffer)
-            .expect("This shouldn't error unless the .data file was modified manually.");
+        let records: HashMap<String, String> = deserialize_from(file_buffer).expect("This shouldn't error unless the .data file was modified manually.");
 
         Vendor { records }
     }
@@ -75,43 +78,28 @@ impl Vendor {
     }
 }
 
-// helper function to reduce redundant code
-fn get_file(path: Option<&str>, file_type: &'static str, file_create: bool) -> File {
-    // maybe only accept .data (bincode) files here?
-    // and load and parse .csv in the update function?
-    let file_path = path.unwrap_or(IEEE_OUI_PATH);
-    let file: Result<File, Error>;
+pub async fn update() -> Result<()>{
+    info!("------- UPDATING IEEE-OUI FILE FROM WEB -------");
 
-    match file_create {
-        true      => file = File::create(file_path.to_owned() + file_type),
-        false     => file = File::open(file_path.to_owned() + file_type),
+    // Check if data directory exists,
+    // create the directory if it doesn't
+    if let Err(_) = fs::read_dir(IEEE_OUI_PATH) {
+        fs::create_dir(IEEE_OUI_PATH)?;
     }
-
-    let file = match file {
-        Ok(file) => file,
-        Err(e)   => {
-            eprintln!("Error opening ieee-oui file: {:#?}", e);
-            std::process::exit(1)
-        },
-    };
-
-    file
-}
-
-// get ieee-oui file from web and convert to bincode .data file
-pub fn update(path: Option<&str>) {
-    // println!("------- UPDATING IEEE-OUI FILE FROM WEB -------");
     
-    let file = get_file(path, IEEE_OUI_FILE_CSV, false);
-    let mut rdr = Reader::from_reader(file);
+    // Download ieee-oui file to new directory
+    let response = reqwest::get(IEEE_OUI_WEB).await?;
+    let content = response.text().await?;
+    
     // parse .csv file and insert records into hashmap
+    let mut rdr = Reader::from_reader(content.as_bytes());
     let mut records = HashMap::new();
     for result in rdr.deserialize::<RawRecord>() {
         // We must tell Serde what type we want to deserialize into.
         match result {
             Ok(record) => records.insert(record.1, record.2 + &record.3),
             Err(e)     => {
-                eprintln!("Error deserializing ieee-oui: {:#?}", e);
+                error!("Error deserializing ieee-oui: {:#?}", e);
                 std::process::exit(1)
             },
         };
@@ -119,14 +107,12 @@ pub fn update(path: Option<&str>) {
     // take the hashmap and serialize using bincode to a binary file
     // for easy loading later
     let vendor             = Vendor { records };
-    let file               = get_file(path, IEEE_OUI_FILE_BIN, true);
+    let file               = File::create(IEEE_OUI_FILE_BIN)?;
     let mut buf_write      = BufWriter::new(file);
-    let serial_result      = serialize_into(&mut buf_write, &vendor);
+    serialize_into(&mut buf_write, &vendor)?;
 
-    // match serial_result {
-    //     Ok(_)  => println!("------- UPDATING COMPLETE -------"),
-    //     Err(e) => eprintln!("Error updating ieee-oui from web: {:#?}", e)
-    // }
+    info!("------- UPDATING COMPLETE -------");
+    Ok(())
 }
 
 #[cfg(test)]

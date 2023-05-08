@@ -3,7 +3,6 @@ pub mod network;
 pub mod time;
 pub mod utils;
 pub mod vendor;
-pub mod vendor_old;
 
 use std::net::IpAddr;
 use std::process;
@@ -17,6 +16,8 @@ use crate::network::NetworkIterator;
 use crate::vendor::Vendor;
 
 pub fn start_scan() {
+    simple_logger::init_with_env().expect("Error initiating simple logger.");
+    
     // Upgrade user privileges when needed
     // ----------------------------------------
     // Providing a prompt for the user when
@@ -39,7 +40,7 @@ pub fn start_scan() {
     }
 
     if matches.get_flag("update") {
-        vendor::update(None);
+        vendor::update();
         process::exit(0);
     }
 
@@ -91,7 +92,7 @@ pub fn start_scan() {
     let timed_out = Arc::new(AtomicBool::new(false));
     let cloned_timed_out = Arc::clone(&timed_out);
 
-    let mut vendor_list = Vendor::new(None);
+    let mut vendor_list = Vendor::new();
 
     let cloned_options = Arc::clone(&scan_options);
     let arp_responses = thread::spawn(move || network::receive_arp_responses(&mut rx, cloned_options, cloned_timed_out, &mut vendor_list));

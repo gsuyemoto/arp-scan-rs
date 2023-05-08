@@ -7,19 +7,19 @@ use regex::{Captures, Regex};
 
 fn benchmark_load_bin(c: &mut Criterion) {
     c.bench_function("Load and parse ieee-oui BIN", |b| b.iter(|| {
-        Vendor::new(Some("../data/"))
+        Vendor::new()
     }));
 }
 
 fn benchmark_load_csv(c: &mut Criterion) {
     c.bench_function("Load and parse ieee-oui CSV", |b| b.iter(|| {
-        vendor::update(Some("../data/"))
+        vendor::update()
     }));
 }
 
 fn benchmark_find_mac(c: &mut Criterion) {
     let mut num_macs: usize = 100;
-    let mut vend = Vendor::new(Some("../data/"));
+    let mut vend = Vendor::new();
     if vend.records.len() < num_macs {num_macs = vend.records.len()}
 
     // Go and load list of OUIs from file
