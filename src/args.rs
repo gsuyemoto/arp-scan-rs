@@ -406,7 +406,10 @@ impl ScanOptions {
             Some(retry_count) => {
     
                 match retry_count.parse::<usize>() {
-                    Ok(retry_number) => retry_number,
+                    Ok(retry_number) => {
+                        if retry_number == 0 {2}
+                        else {retry_number}
+                    },
                     Err(_) => {
                         eprintln!("Expected positive number for host retry count");
                         process::exit(1);
